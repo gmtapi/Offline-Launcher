@@ -46,6 +46,8 @@ import com.atlauncher.data.Instance;
 import com.atlauncher.data.minecraft.loaders.LoaderType;
 import com.atlauncher.gui.components.CollapsiblePanel;
 import com.atlauncher.gui.components.DropDownButton;
+import com.atlauncher.data.AbstractAccount;
+import com.atlauncher.data.OfflineAccount;
 import com.atlauncher.gui.components.ImagePanel;
 import com.atlauncher.gui.dialogs.AddModsDialog;
 import com.atlauncher.gui.dialogs.EditModsDialog;
@@ -88,16 +90,7 @@ public class InstanceCard extends CollapsiblePanel {
                 }
             });
 
-    private final JPopupMenu playPopupMenu = new JPopupMenu();
-    private final JMenuItem playOnlinePlayMenuItem = new JMenuItem(GetText.tr("Play Online"));
-    private final JMenuItem playOfflinePlayMenuItem = new JMenuItem(GetText.tr("Play Offline"));
-    private final DropDownButton playButton = new DropDownButton(GetText.tr("Play"), playPopupMenu, true,
-            new MouseAdapter() {
-                @Override
-                public void mousePressed(MouseEvent e) {
-                    play(false);
-                }
-            });
+    private final JButton playButton = new JButton(GetText.tr("Play"));
 
     private final JPopupMenu backupPopupMenu = new JPopupMenu();
     private final JMenuItem normalBackupMenuItem = new JMenuItem(GetText.tr("Normal Backup"));
@@ -197,6 +190,7 @@ public class InstanceCard extends CollapsiblePanel {
         as.setBottomComponent(bottom);
         as.setBorder(BorderFactory.createEmptyBorder(5, 0, 5, 0));
 
+        this.playButton.addActionListener(e -> play());
         top.add(this.playButton);
         top.add(this.updateButton);
         top.add(this.getHelpButton);
@@ -207,7 +201,7 @@ public class InstanceCard extends CollapsiblePanel {
         bottom.add(this.deleteButton);
         bottom.add(this.exportButton);
 
-        setupPlayPopupMenus();
+
         setupOpenPopupMenus();
         setupButtonPopupMenus();
 
@@ -262,13 +256,7 @@ public class InstanceCard extends CollapsiblePanel {
         this.addMouseListeners();
     }
 
-    private void setupPlayPopupMenus() {
-        playOnlinePlayMenuItem.addActionListener(e -> play(false));
-        playPopupMenu.add(playOnlinePlayMenuItem);
 
-        playOfflinePlayMenuItem.addActionListener(e -> play(true));
-        playPopupMenu.add(playOfflinePlayMenuItem);
-    }
 
     private void setupOpenPopupMenus() {
         openResourceMenuItem.addActionListener(e -> {
@@ -548,7 +536,7 @@ public class InstanceCard extends CollapsiblePanel {
         });
     }
 
-    private void play(boolean offline) {
+    private void play() {
         if (!instance.launcher.isPlayable) {
             DialogManager.okDialog().setTitle(GetText.tr("Instance Corrupt"))
                     .setContent(GetText
@@ -566,6 +554,9 @@ public class InstanceCard extends CollapsiblePanel {
             return;
         }
 
+        AbstractAccount account = AccountManager.getSelectedAccount();
+        boolean offline = account instanceof OfflineAccount;
+
         if (hasUpdate && !instance.hasLatestUpdateBeenIgnored()) {
             int ret = DialogManager.yesNoDialog().setTitle(GetText.tr("Update Available"))
                     .setContent(new HTMLBuilder().center()
@@ -577,7 +568,7 @@ public class InstanceCard extends CollapsiblePanel {
                     .show();
 
             if (ret == 0) {
-                if (AccountManager.getSelectedAccount() == null) {
+                if (account == null) {
                     DialogManager.okDialog().setTitle(GetText.tr("No Account Selected"))
                             .setContent(GetText.tr("Cannot update pack as you have no account selected."))
                             .setType(DialogManager.ERROR).show();
@@ -593,7 +584,7 @@ public class InstanceCard extends CollapsiblePanel {
                 }
 
                 if (!App.launcher.minecraftLaunched) {
-                    if (instance.launch()) {
+                    if (instance.launch(offline)) {
                         App.launcher.setMinecraftLaunched(true);
                     }
                 }
@@ -612,17 +603,13 @@ public class InstanceCard extends CollapsiblePanel {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getButton() == MouseEvent.BUTTON1 && e.getClickCount() >= 2) {
-                    play(false);
+                    play();
                 } else if (e.getButton() == MouseEvent.BUTTON3) {
                     JPopupMenu rightClickMenu = new JPopupMenu();
 
-                    JMenuItem playOnlineButton = new JMenuItem(GetText.tr("Play Online"));
-                    playOnlineButton.addActionListener(l -> play(false));
-                    rightClickMenu.add(playOnlineButton);
-
-                    JMenuItem playOfflineButton = new JMenuItem(GetText.tr("Play Offline"));
-                    playOfflineButton.addActionListener(l -> play(true));
-                    rightClickMenu.add(playOnlineButton);
+                    JMenuItem playButton = new JMenuItem(GetText.tr("Play"));
+                    playButton.addActionListener(l -> play());
+                    rightClickMenu.add(playButton);
 
                     if (instance.isUpdatable()) {
                         rightClickMenu.addSeparator();

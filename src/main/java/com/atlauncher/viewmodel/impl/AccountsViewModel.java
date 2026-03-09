@@ -23,7 +23,9 @@ import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
+import com.atlauncher.data.AbstractAccount;
 import com.atlauncher.data.MicrosoftAccount;
+import com.atlauncher.data.OfflineAccount;
 import com.atlauncher.gui.dialogs.ChangeSkinDialog;
 import com.atlauncher.managers.AccountManager;
 import com.atlauncher.network.Analytics;
@@ -36,7 +38,7 @@ public class AccountsViewModel implements IAccountsViewModel {
         return AccountManager.getAccounts().size();
     }
 
-    private List<MicrosoftAccount> accounts() {
+    private List<AbstractAccount> accounts() {
         return AccountManager.getAccounts();
     }
 
@@ -55,15 +57,21 @@ public class AccountsViewModel implements IAccountsViewModel {
     public void pushNewAccounts() {
         _onAccountsChanged.accept(
                 accounts().stream()
-                        .map(account -> account.minecraftUsername)
+                        .map(account -> {
+                            String name = account.minecraftUsername;
+                            if (account instanceof OfflineAccount) {
+                                name = name + " (Offline)";
+                            }
+                            return name;
+                        })
                         .collect(Collectors.toList()));
     }
 
-    private Consumer<MicrosoftAccount> selected;
+    private Consumer<AbstractAccount> selected;
     private int selectedAccountIndex = -1;
 
     @Override
-    public void onAccountSelected(Consumer<MicrosoftAccount> onAccountSelected) {
+    public void onAccountSelected(Consumer<AbstractAccount> onAccountSelected) {
         selected = onAccountSelected;
     }
 
@@ -79,7 +87,7 @@ public class AccountsViewModel implements IAccountsViewModel {
 
     @Nullable
     @Override
-    public MicrosoftAccount getSelectedAccount() {
+    public AbstractAccount getSelectedAccount() {
         return accounts().get(selectedAccountIndex);
     }
 
@@ -92,26 +100,29 @@ public class AccountsViewModel implements IAccountsViewModel {
     public boolean refreshAccessToken() {
         Analytics.trackEvent(AnalyticsEvent.simpleEvent("account_refresh_access_token"));
 
-        MicrosoftAccount account = getSelectedAccount();
+        AbstractAccount account = getSelectedAccount();
         if (account == null) {
             return false;
         }
 
-        boolean success = account
-                .refreshAccessToken(true);
+        if (account instanceof MicrosoftAccount) {
+            MicrosoftAccount msAccount = (MicrosoftAccount) account;
+            boolean success = msAccount.refreshAccessToken(true);
 
-        if (!success) {
-            account.mustLogin = true;
+            if (!success) {
+                msAccount.mustLogin = true;
+            }
+
+            AccountManager.saveAccounts();
+            return success;
         }
 
-        AccountManager.saveAccounts();
-
-        return success;
+        return true;
     }
 
     @Override
     public void updateUsername() {
-        MicrosoftAccount account = getSelectedAccount();
+        AbstractAccount account = getSelectedAccount();
         if (account != null) {
             Analytics.trackEvent(AnalyticsEvent.simpleEvent("account_update_username"));
             account.updateUsername();
@@ -122,17 +133,17 @@ public class AccountsViewModel implements IAccountsViewModel {
 
     @Override
     public void changeSkin() {
-        MicrosoftAccount account = getSelectedAccount();
+        AbstractAccount account = getSelectedAccount();
 
-        if (account != null) {
-            ChangeSkinDialog changeSkinDialog = new ChangeSkinDialog(account);
+        if (account != null && account instanceof MicrosoftAccount) {
+            ChangeSkinDialog changeSkinDialog = new ChangeSkinDialog((MicrosoftAccount) account);
             changeSkinDialog.setVisible(true);
         }
     }
 
     @Override
     public void updateSkin() {
-        MicrosoftAccount account = getSelectedAccount();
+        AbstractAccount account = getSelectedAccount();
         if (account != null) {
             Analytics.trackEvent(AnalyticsEvent.simpleEvent("account_update_skin"));
             account.updateSkin();
@@ -141,11 +152,27 @@ public class AccountsViewModel implements IAccountsViewModel {
 
     @Override
     public void deleteAccount() {
-        MicrosoftAccount account = getSelectedAccount();
+        AbstractAccount account = getSelectedAccount();
         if (account != null) {
             Analytics.trackEvent(AnalyticsEvent.simpleEvent("account_delete"));
             AccountManager.removeAccount(account);
             pushNewAccounts();
         }
+    }
+
+    @Override
+    public void addOfflineAccount(String username) {
+        if (username == null || username.trim().isEmpty()) {
+            return;
+        }
+
+        // Check if account with this username already exists
+        if (AccountManager.isAccountByName(username.trim())) {
+            return;
+        }
+
+        OfflineAccount offlineAccount = new OfflineAccount(username.trim());
+        AccountManager.addAccount(offlineAccount);
+        pushNewAccounts();
     }
 }

@@ -25,9 +25,10 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
 
-import com.atlauncher.data.MicrosoftAccount;
+import com.atlauncher.data.AbstractAccount;
+import com.atlauncher.data.OfflineAccount;
 
-public class AccountsDropDownRenderer extends JLabel implements ListCellRenderer<MicrosoftAccount> {
+public class AccountsDropDownRenderer extends JLabel implements ListCellRenderer<AbstractAccount> {
     public AccountsDropDownRenderer() {
         setOpaque(true);
         setHorizontalAlignment(CENTER);
@@ -48,7 +49,7 @@ public class AccountsDropDownRenderer extends JLabel implements ListCellRenderer
      * @return A component whose paint() method will render the specified value
      */
     @Override
-    public Component getListCellRendererComponent(JList<? extends MicrosoftAccount> list, MicrosoftAccount account,
+    public Component getListCellRendererComponent(JList<? extends AbstractAccount> list, AbstractAccount account,
             int index, boolean isSelected, boolean cellHasFocus) {
         if (account == null) {
             return this;
@@ -64,6 +65,9 @@ public class AccountsDropDownRenderer extends JLabel implements ListCellRenderer
 
         ImageIcon icon = account.getMinecraftHead();
         String username = account.minecraftUsername;
+        if (account instanceof OfflineAccount) {
+            username = username + " (Offline)";
+        }
         setIcon(icon);
         setText(username);
         setFont(list.getFont());

@@ -36,7 +36,9 @@ import org.mini2Dx.gettext.GetText;
 import com.atlauncher.App;
 import com.atlauncher.FileSystem;
 import com.atlauncher.Gsons;
+import com.atlauncher.data.AbstractAccount;
 import com.atlauncher.data.MicrosoftAccount;
+import com.atlauncher.data.OfflineAccount;
 import com.google.gson.JsonIOException;
 import com.google.gson.reflect.TypeToken;
 
@@ -44,33 +46,33 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.subjects.BehaviorSubject;
 
 public class AccountManager {
-    private static final Type microsoftAccountListType = new TypeToken<List<MicrosoftAccount>>() {
+    private static final Type abstractAccountListType = new TypeToken<List<AbstractAccount>>() {
     }.getType();
 
-    public static final BehaviorSubject<List<MicrosoftAccount>> ACCOUNTS = BehaviorSubject
+    public static final BehaviorSubject<List<AbstractAccount>> ACCOUNTS = BehaviorSubject
         .createDefault(new ArrayList<>());
 
     /**
      * Account using the Launcher
      */
-    public static final BehaviorSubject<Optional<MicrosoftAccount>> SELECTED_ACCOUNT = BehaviorSubject
+    public static final BehaviorSubject<Optional<AbstractAccount>> SELECTED_ACCOUNT = BehaviorSubject
         .createDefault(Optional.empty());
 
-    public static Observable<List<MicrosoftAccount>> getAccountsObservable() {
+    public static Observable<List<AbstractAccount>> getAccountsObservable() {
         return ACCOUNTS;
     }
 
-    public static Observable<Optional<MicrosoftAccount>> getSelectedAccountObservable() {
+    public static Observable<Optional<AbstractAccount>> getSelectedAccountObservable() {
         return SELECTED_ACCOUNT;
     }
 
     @Nonnull
-    public static List<MicrosoftAccount> getAccounts() {
+    public static List<AbstractAccount> getAccounts() {
         return Optional.ofNullable(ACCOUNTS.getValue()).orElse(new ArrayList<>());
     }
 
     @Nullable
-    public static MicrosoftAccount getSelectedAccount() {
+    public static AbstractAccount getSelectedAccount() {
         return SELECTED_ACCOUNT.getValue().orElse(null);
     }
 
@@ -81,15 +83,25 @@ public class AccountManager {
         PerformanceManager.start();
         LogManager.debug("Loading accounts");
 
-        ArrayList<MicrosoftAccount> newAccounts = new ArrayList<>();
+        ArrayList<AbstractAccount> newAccounts = new ArrayList<>();
 
         if (Files.exists(FileSystem.ACCOUNTS)) {
             try (InputStreamReader fileReader = new InputStreamReader(
                 Files.newInputStream(FileSystem.ACCOUNTS), StandardCharsets.UTF_8)) {
-                List<MicrosoftAccount> accounts = Gsons.DEFAULT.fromJson(fileReader, microsoftAccountListType);
+                List<AbstractAccount> accounts = Gsons.DEFAULT.fromJson(fileReader, abstractAccountListType);
 
-                newAccounts.addAll(accounts.stream().filter(account -> account.accessToken != null
-                    && account.accessToken.split("\\.").length == 3).collect(Collectors.toList()));
+                if (accounts != null) {
+                    newAccounts.addAll(accounts.stream().filter(account -> {
+                        if (account instanceof OfflineAccount) {
+                            return true;
+                        } else if (account instanceof MicrosoftAccount) {
+                            MicrosoftAccount msAccount = (MicrosoftAccount) account;
+                            return msAccount.accessToken != null
+                                && msAccount.accessToken.split("\\.").length == 3;
+                        }
+                        return false;
+                    }).collect(Collectors.toList()));
+                }
             } catch (Exception e) {
                 LogManager.logStackTrace("Exception loading accounts", e);
             }
@@ -97,7 +109,7 @@ public class AccountManager {
 
         ACCOUNTS.onNext(newAccounts);
 
-        for (MicrosoftAccount account : newAccounts) {
+        for (AbstractAccount account : newAccounts) {
             if (account.username.equalsIgnoreCase(App.settings.lastAccount)) {
                 SELECTED_ACCOUNT.onNext(Optional.of(account));
             }
@@ -115,19 +127,20 @@ public class AccountManager {
         saveAccounts(ACCOUNTS.getValue());
     }
 
-    private static void saveAccounts(List<MicrosoftAccount> accounts) {
+    private static void saveAccounts(List<AbstractAccount> accounts) {
         try (OutputStreamWriter fileWriter = new OutputStreamWriter(
             Files.newOutputStream(FileSystem.ACCOUNTS), StandardCharsets.UTF_8)) {
-            Gsons.DEFAULT.toJson(accounts, microsoftAccountListType, fileWriter);
+            Gsons.DEFAULT.toJson(accounts, abstractAccountListType, fileWriter);
         } catch (JsonIOException | IOException e) {
             LogManager.logStackTrace(e);
         }
     }
 
-    public static void addAccount(MicrosoftAccount account) {
-        LogManager.info("Added Microsoft Account " + account);
+    public static void addAccount(AbstractAccount account) {
+        String accountType = (account instanceof OfflineAccount) ? "Offline" : "Microsoft";
+        LogManager.info("Added " + accountType + " Account " + account);
 
-        List<MicrosoftAccount> accounts = ACCOUNTS.getValue();
+        List<AbstractAccount> accounts = ACCOUNTS.getValue();
         accounts.add(account);
         ACCOUNTS.onNext(accounts);
 
@@ -148,8 +161,8 @@ public class AccountManager {
         saveAccounts();
     }
 
-    public static void removeAccount(MicrosoftAccount account) {
-        List<MicrosoftAccount> accounts = ACCOUNTS.getValue();
+    public static void removeAccount(AbstractAccount account) {
+        List<AbstractAccount> accounts = ACCOUNTS.getValue();
         if (SELECTED_ACCOUNT.getValue().orElse(null) == account) {
             if (accounts.size() == 1) {
                 // if this was the only account, don't set an account
@@ -169,7 +182,7 @@ public class AccountManager {
      *
      * @param account Account to switch to
      */
-    public static void switchAccount(@Nullable MicrosoftAccount account) {
+    public static void switchAccount(@Nullable AbstractAccount account) {
         if (account == null) {
             LogManager.info("Logging out of account");
             SELECTED_ACCOUNT.onNext(Optional.empty());
@@ -189,8 +202,8 @@ public class AccountManager {
      * @param username Username of the Account to find
      * @return Account if the Account is found from the username
      */
-    public static MicrosoftAccount getAccountByName(String username) {
-        for (MicrosoftAccount account : ACCOUNTS.getValue()) {
+    public static AbstractAccount getAccountByName(String username) {
+        for (AbstractAccount account : ACCOUNTS.getValue()) {
             if (account.username.equalsIgnoreCase(username)) {
                 return account;
             }
@@ -205,7 +218,7 @@ public class AccountManager {
      * @return true if found, false if not
      */
     public static boolean isAccountByName(String username) {
-        for (MicrosoftAccount account : ACCOUNTS.getValue()) {
+        for (AbstractAccount account : ACCOUNTS.getValue()) {
             if (account.username.equalsIgnoreCase(username)) {
                 return true;
             }

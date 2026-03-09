@@ -328,11 +328,13 @@ public final class LoginWithMicrosoftDialog extends JDialog {
     private void addAccount(OauthTokenResponse oauthTokenResponse, XboxLiveAuthResponse xstsAuthResponse,
         LoginResponse loginResponse, Profile profile) throws Exception {
         if (account != null || AccountManager.isAccountByName(loginResponse.username)) {
-            MicrosoftAccount existingAccount = AccountManager.getAccountByName(loginResponse.username);
+            com.atlauncher.data.AbstractAccount existingAbstract = AccountManager.getAccountByName(loginResponse.username);
 
-            if (existingAccount == null) {
+            if (existingAbstract == null || !(existingAbstract instanceof MicrosoftAccount)) {
                 return;
             }
+
+            MicrosoftAccount existingAccount = (MicrosoftAccount) existingAbstract;
 
             // if forced to relogin, then make sure they logged into correct account
             if (this.account != null && !existingAccount.username.equals(this.account.username)) {

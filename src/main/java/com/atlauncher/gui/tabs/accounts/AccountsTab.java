@@ -34,13 +34,16 @@ import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JTextField;
 import javax.swing.event.HyperlinkEvent;
 
 import org.mini2Dx.gettext.GetText;
 
 import com.atlauncher.App;
 import com.atlauncher.builders.HTMLBuilder;
+import com.atlauncher.data.AbstractAccount;
 import com.atlauncher.data.MicrosoftAccount;
+import com.atlauncher.data.OfflineAccount;
 import com.atlauncher.gui.dialogs.LoginWithMicrosoftDialog;
 import com.atlauncher.gui.dialogs.ProgressDialog;
 import com.atlauncher.gui.panels.HierarchyPanel;
@@ -63,6 +66,8 @@ public class AccountsTab extends HierarchyPanel implements Tab {
     private JComboBox<ComboItem<String>> accountsComboBox;
     private JButton deleteButton;
     private JButton loginWithMicrosoftButton;
+    private JButton addOfflineAccountButton;
+    private JTextField offlineUsernameField;
     private JMenuItem refreshAccessTokenMenuItem;
     private JMenuItem updateSkin;
     private JMenuItem changeSkin;
@@ -79,16 +84,13 @@ public class AccountsTab extends HierarchyPanel implements Tab {
         infoPanel.setBorder(BorderFactory.createEmptyBorder(60, 250, 0, 250));
 
         JEditorPane infoTextPane = new JEditorPane("text/html", new HTMLBuilder().center().text(GetText.tr(
-                "In order to login and use ATLauncher modpacks, " +
-                    "you must authenticate with your existing " +
-                    "Minecraft/Mojang account. You must own and have paid " +
-                    "for the Minecraft Java edition " +
-                    "(not the Windows 10 edition) and use the same " +
-                    "login here.<br><br>If you don't have an existing " +
+                "In order to play online, you can authenticate with your existing " +
+                    "Minecraft/Microsoft account. You can also add an offline account " +
+                    "to play in offline/singleplayer mode without needing to purchase " +
+                    "Minecraft.\u003cbr\u003e\u003cbr\u003eIf you don't have an existing " +
                     "account, you can get one " +
-                    "<a href=\"https://atl.pw/create-account\">by buying " +
-                    "Minecraft here</a>. ATLauncher doesn't work with cracked" +
-                    " accounts."))
+                    "\u003ca href=\"https://atl.pw/create-account\"\u003eby buying " +
+                    "Minecraft here\u003c/a\u003e, or simply add an offline account below."))
             .build());
         infoTextPane.setEditable(false);
         infoTextPane.setFocusable(false);
@@ -170,6 +172,69 @@ public class AccountsTab extends HierarchyPanel implements Tab {
         buttons.add(loginWithMicrosoftButton);
         bottomPanel.add(buttons, gbc);
 
+        // Offline account section
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.gridwidth = 2;
+        gbc.insets = new Insets(20, 0, 5, 0);
+        JLabel offlineLabel = new JLabel(GetText.tr("Add Offline Account"));
+        bottomPanel.add(offlineLabel, gbc);
+
+        gbc.gridy++;
+        gbc.gridwidth = 2;
+        gbc.insets = new Insets(5, 0, 5, 0);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        JPanel offlinePanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        offlineUsernameField = new JTextField(15);
+        offlineUsernameField.setToolTipText(GetText.tr("Enter your offline username"));
+        offlineUsernameField.setName("offlineUsernameField");
+
+        addOfflineAccountButton = new JButton(GetText.tr("Add Offline Account"));
+        addOfflineAccountButton.addActionListener(e -> {
+            String username = offlineUsernameField.getText().trim();
+            if (username.isEmpty()) {
+                DialogManager.okDialog()
+                    .setTitle(GetText.tr("Error"))
+                    .setContent(GetText.tr("Please enter a username for the offline account."))
+                    .setType(DialogManager.ERROR).show();
+                return;
+            }
+
+            if (username.length() < 3 || username.length() > 16) {
+                DialogManager.okDialog()
+                    .setTitle(GetText.tr("Error"))
+                    .setContent(GetText.tr("Username must be between 3 and 16 characters."))
+                    .setType(DialogManager.ERROR).show();
+                return;
+            }
+
+            if (!username.matches("[a-zA-Z0-9_]+")) {
+                DialogManager.okDialog()
+                    .setTitle(GetText.tr("Error"))
+                    .setContent(GetText.tr("Username can only contain letters, numbers, and underscores."))
+                    .setType(DialogManager.ERROR).show();
+                return;
+            }
+
+            if (AccountManager.isAccountByName(username)) {
+                DialogManager.okDialog()
+                    .setTitle(GetText.tr("Error"))
+                    .setContent(GetText.tr("An account with this username already exists."))
+                    .setType(DialogManager.ERROR).show();
+                return;
+            }
+
+            viewModel.addOfflineAccount(username);
+            offlineUsernameField.setText("");
+            viewModel.pushNewAccounts();
+        });
+
+        offlineUsernameField.addActionListener(e -> addOfflineAccountButton.doClick());
+
+        offlinePanel.add(offlineUsernameField);
+        offlinePanel.add(addOfflineAccountButton);
+        bottomPanel.add(offlinePanel, gbc);
+
         rightPanel.add(bottomPanel, BorderLayout.CENTER);
 
         contextMenu = new JPopupMenu();
@@ -180,7 +245,7 @@ public class AccountsTab extends HierarchyPanel implements Tab {
 
             // TODO Have this done via listener
             // To describe, userSkin icon should be reactive, not active.
-            MicrosoftAccount account = viewModel.getSelectedAccount();
+            AbstractAccount account = viewModel.getSelectedAccount();
             if (account != null) {
                 userSkin.setIcon(account.getMinecraftSkin());
             }
@@ -193,7 +258,7 @@ public class AccountsTab extends HierarchyPanel implements Tab {
 
             // TODO Have this done via listener
             // To describe, userSkin icon should be reactive, not active.
-            MicrosoftAccount account = viewModel.getSelectedAccount();
+            AbstractAccount account = viewModel.getSelectedAccount();
             if (account != null) {
                 userSkin.setIcon(account.getMinecraftSkin());
             }
@@ -235,16 +300,18 @@ public class AccountsTab extends HierarchyPanel implements Tab {
      * Refresh the access token, and react to result
      */
     private void refreshAccessToken() {
-        MicrosoftAccount account = viewModel.getSelectedAccount();
-        if (account == null) {
+        AbstractAccount account = viewModel.getSelectedAccount();
+        if (account == null || !(account instanceof MicrosoftAccount)) {
             return;
         }
 
+        MicrosoftAccount msAccount = (MicrosoftAccount) account;
+
         final ProgressDialog<Boolean> dialog = new ProgressDialog<>(
-            GetText.tr("Refreshing Access Token For {0}", account.minecraftUsername),
+            GetText.tr("Refreshing Access Token For {0}", msAccount.minecraftUsername),
             0,
-            GetText.tr("Refreshing Access Token For {0}", account.minecraftUsername),
-            "Aborting refreshing access token for " + account.minecraftUsername);
+            GetText.tr("Refreshing Access Token For {0}", msAccount.minecraftUsername),
+            "Aborting refreshing access token for " + msAccount.minecraftUsername);
 
         dialog.addThread(new Thread(() -> {
             boolean success = viewModel.refreshAccessToken();
@@ -271,7 +338,7 @@ public class AccountsTab extends HierarchyPanel implements Tab {
                 .setType(DialogManager.ERROR)
                 .show();
 
-            LoginWithMicrosoftDialog loginWithMicrosoftDialog = new LoginWithMicrosoftDialog(account);
+            LoginWithMicrosoftDialog loginWithMicrosoftDialog = new LoginWithMicrosoftDialog(msAccount);
             loginWithMicrosoftDialog.setVisible(true);
         }
     }
@@ -286,10 +353,15 @@ public class AccountsTab extends HierarchyPanel implements Tab {
                 userSkin.setIcon(SkinUtils.getDefaultSkin());
                 loginWithMicrosoftButton.setVisible(true);
                 refreshAccessTokenMenuItem.setVisible(false);
+                if (changeSkin != null) changeSkin.setVisible(true);
+                if (updateSkin != null) updateSkin.setVisible(true);
             } else {
                 deleteButton.setVisible(true);
                 loginWithMicrosoftButton.setVisible(true);
-                refreshAccessTokenMenuItem.setVisible(true);
+
+                boolean isMicrosoft = account instanceof MicrosoftAccount;
+                refreshAccessTokenMenuItem.setVisible(isMicrosoft);
+                if (changeSkin != null) changeSkin.setVisible(isMicrosoft);
 
                 deleteButton.setText(GetText.tr("Delete"));
                 userSkin.setIcon(account.getMinecraftSkin());
@@ -326,6 +398,8 @@ public class AccountsTab extends HierarchyPanel implements Tab {
         accountsComboBox = null;
         deleteButton = null;
         loginWithMicrosoftButton = null;
+        addOfflineAccountButton = null;
+        offlineUsernameField = null;
         refreshAccessTokenMenuItem = null;
         updateSkin = null;
         changeSkin = null;

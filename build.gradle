@@ -283,7 +283,7 @@ def currentYear() {
 }
 
 launch4j {
-    outfile = "ATLauncher-${project.version}.exe"
+    outfile = "OfflineLauncher.exe"
     jreMinVersion = "${project.targetCompatibility.toString()}"
     mainClassName = 'com.atlauncher.App'
     icon = "${projectDir}/src/main/resources/assets/image/icon.ico"

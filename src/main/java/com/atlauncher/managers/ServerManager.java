@@ -27,7 +27,7 @@ import java.util.Optional;
 
 import com.atlauncher.FileSystem;
 import com.atlauncher.Gsons;
-import com.atlauncher.data.MicrosoftAccount;
+import com.atlauncher.data.AbstractAccount;
 import com.atlauncher.data.Server;
 import com.atlauncher.utils.FileUtils;
 import com.atlauncher.utils.Utils;
@@ -84,7 +84,7 @@ public class ServerManager {
     }
 
     public static void setServerVisibility(Server server, boolean collapsed) {
-        MicrosoftAccount selectedAccount = AccountManager.getSelectedAccount();
+        AbstractAccount selectedAccount = AccountManager.getSelectedAccount();
 
         if (server != null && selectedAccount != null) {
             if (collapsed) {

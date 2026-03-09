@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
-import com.atlauncher.data.MicrosoftAccount;
+import com.atlauncher.data.AbstractAccount;
 
 /**
  * The view model for Accounts tab, handles all background activity
@@ -39,7 +39,7 @@ public interface IAccountsViewModel {
      *
      * @param onAccountSelected function to call
      */
-    void onAccountSelected(Consumer<MicrosoftAccount> onAccountSelected);
+    void onAccountSelected(Consumer<AbstractAccount> onAccountSelected);
 
     /**
      * Get the count of accounts in the launcher
@@ -97,6 +97,13 @@ public interface IAccountsViewModel {
      */
     boolean refreshAccessToken();
 
+    /**
+     * Add an offline account with the given username
+     *
+     * @param username the username for the offline account
+     */
+    void addOfflineAccount(String username);
+
     // Account login
 
     /**
@@ -105,7 +112,7 @@ public interface IAccountsViewModel {
      * @return the currently selected account
      */
     @Nullable
-    MicrosoftAccount getSelectedAccount();
+    AbstractAccount getSelectedAccount();
 
     /**
      * Post result for login
